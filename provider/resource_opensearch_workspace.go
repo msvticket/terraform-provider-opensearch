@@ -36,6 +36,60 @@ var openSearchWorkspaceSchema = map[string]*schema.Schema{
 		Elem:        &schema.Schema{Type: schema.TypeString},
 		Description: "List of features enabled for this workspace.",
 	},
+	"permissions": {
+		Type:        schema.TypeList,
+		Optional:    true,
+		MaxItems:    1,
+		Description: "Permissions configuration for the workspace.",
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"library_write": {
+					Type:        schema.TypeList,
+					Optional:    true,
+					MaxItems:    1,
+					Description: "Users and groups with write permissions.",
+					Elem: &schema.Resource{
+						Schema: map[string]*schema.Schema{
+							"users": {
+								Type:        schema.TypeSet,
+								Optional:    true,
+								Description: "List of users with write permissions.",
+								Elem:        &schema.Schema{Type: schema.TypeString},
+							},
+							"groups": {
+								Type:        schema.TypeSet,
+								Optional:    true,
+								Description: "List of groups with write permissions.",
+								Elem:        &schema.Schema{Type: schema.TypeString},
+							},
+						},
+					},
+				},
+				"library_read": {
+					Type:        schema.TypeList,
+					Optional:    true,
+					MaxItems:    1,
+					Description: "Users and groups with read permissions.",
+					Elem: &schema.Resource{
+						Schema: map[string]*schema.Schema{
+							"users": {
+								Type:        schema.TypeSet,
+								Optional:    true,
+								Description: "List of users with read permissions.",
+								Elem:        &schema.Schema{Type: schema.TypeString},
+							},
+							"groups": {
+								Type:        schema.TypeSet,
+								Optional:    true,
+								Description: "List of groups with read permissions.",
+								Elem:        &schema.Schema{Type: schema.TypeString},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
 }
 
 func resourceOpenSearchWorkspace() *schema.Resource {
@@ -81,6 +135,9 @@ func resourceOpensearchWorkspaceRead(d *schema.ResourceData, m interface{}) erro
 	ds.set("description", res.Description)
 	if len(res.Features) > 0 {
 		ds.set("features", flattenStringSet(res.Features))
+	}
+	if res.Permissions != nil {
+		ds.set("permissions", flattenWorkspacePermissions(res.Permissions))
 	}
 
 	return ds.err
@@ -173,6 +230,10 @@ func resourceOpensearchPutWorkspace(d *schema.ResourceData, m interface{}) (*Wor
 		workspaceDefinition.Features = expandStringList(v.(*schema.Set).List())
 	}
 
+	if v, ok := d.GetOk("permissions"); ok {
+		workspaceDefinition.Permissions = expandWorkspacePermissions(v.([]interface{}))
+	}
+
 	workspaceJSON, err := json.Marshal(workspaceDefinition)
 	if err != nil {
 		return response, fmt.Errorf("Body Error : %s", workspaceJSON)
@@ -233,14 +294,104 @@ func resourceOpensearchPutWorkspace(d *schema.ResourceData, m interface{}) (*Wor
 
 // WorkspaceBody represents the structure of a workspace
 type WorkspaceBody struct {
-	ID          string   `json:"id,omitempty"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Features    []string `json:"features,omitempty"`
+	ID          string                 `json:"id,omitempty"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Features    []string               `json:"features,omitempty"`
+	Permissions *WorkspacePermissions  `json:"permissions,omitempty"`
 }
 
 // WorkspaceResponse represents the API response for workspace operations
 type WorkspaceResponse struct {
 	Success bool          `json:"success"`
 	Result  WorkspaceBody `json:"result"`
+}
+
+// WorkspacePermissions represents the permissions structure for a workspace
+type WorkspacePermissions struct {
+	LibraryWrite *PermissionLevel `json:"library_write,omitempty"`
+	LibraryRead  *PermissionLevel `json:"library_read,omitempty"`
+}
+
+// PermissionLevel represents users and groups at a permission level
+type PermissionLevel struct {
+	Users  []string `json:"users,omitempty"`
+	Groups []string `json:"groups,omitempty"`
+}
+
+// expandWorkspacePermissions converts Terraform schema data to WorkspacePermissions
+func expandWorkspacePermissions(perms []interface{}) *WorkspacePermissions {
+	if len(perms) == 0 || perms[0] == nil {
+		return nil
+	}
+
+	permMap := perms[0].(map[string]interface{})
+	result := &WorkspacePermissions{}
+
+	if v, ok := permMap["library_write"]; ok && len(v.([]interface{})) > 0 {
+		if writeMap := v.([]interface{})[0].(map[string]interface{}); writeMap != nil {
+			result.LibraryWrite = &PermissionLevel{}
+			if users, ok := writeMap["users"]; ok {
+				result.LibraryWrite.Users = expandStringList(users.(*schema.Set).List())
+			}
+			if groups, ok := writeMap["groups"]; ok {
+				result.LibraryWrite.Groups = expandStringList(groups.(*schema.Set).List())
+			}
+		}
+	}
+
+	if v, ok := permMap["library_read"]; ok && len(v.([]interface{})) > 0 {
+		if readMap := v.([]interface{})[0].(map[string]interface{}); readMap != nil {
+			result.LibraryRead = &PermissionLevel{}
+			if users, ok := readMap["users"]; ok {
+				result.LibraryRead.Users = expandStringList(users.(*schema.Set).List())
+			}
+			if groups, ok := readMap["groups"]; ok {
+				result.LibraryRead.Groups = expandStringList(groups.(*schema.Set).List())
+			}
+		}
+	}
+
+	return result
+}
+
+// flattenWorkspacePermissions converts WorkspacePermissions to Terraform schema data
+func flattenWorkspacePermissions(perms *WorkspacePermissions) []interface{} {
+	if perms == nil {
+		return []interface{}{}
+	}
+
+	result := make(map[string]interface{})
+
+	if perms.LibraryWrite != nil {
+		writePerms := make(map[string]interface{})
+		if len(perms.LibraryWrite.Users) > 0 {
+			writePerms["users"] = flattenStringSet(perms.LibraryWrite.Users)
+		}
+		if len(perms.LibraryWrite.Groups) > 0 {
+			writePerms["groups"] = flattenStringSet(perms.LibraryWrite.Groups)
+		}
+		if len(writePerms) > 0 {
+			result["library_write"] = []interface{}{writePerms}
+		}
+	}
+
+	if perms.LibraryRead != nil {
+		readPerms := make(map[string]interface{})
+		if len(perms.LibraryRead.Users) > 0 {
+			readPerms["users"] = flattenStringSet(perms.LibraryRead.Users)
+		}
+		if len(perms.LibraryRead.Groups) > 0 {
+			readPerms["groups"] = flattenStringSet(perms.LibraryRead.Groups)
+		}
+		if len(readPerms) > 0 {
+			result["library_read"] = []interface{}{readPerms}
+		}
+	}
+
+	if len(result) == 0 {
+		return []interface{}{}
+	}
+
+	return []interface{}{result}
 }

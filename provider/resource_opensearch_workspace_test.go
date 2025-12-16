@@ -53,6 +53,17 @@ func TestAccOpensearchWorkspace(t *testing.T) {
 					),
 				),
 			},
+			{
+				Config: testAccOpenSearchWorkspaceResourceWithPermissions(randomName),
+				Check: resource.ComposeTestCheckFunc(
+					testCheckOpensearchWorkspaceExists("opensearch_workspace.test"),
+					resource.TestCheckResourceAttr(
+						"opensearch_workspace.test",
+						"description",
+						"workspace with permissions",
+					),
+				),
+			},
 		},
 	})
 }
@@ -116,6 +127,27 @@ func testAccOpenSearchWorkspaceResourceUpdated(resourceName string) string {
 resource "opensearch_workspace" "test" {
   name        = "%s"
   description = "updated test workspace"
+}
+	`, resourceName)
+}
+
+func testAccOpenSearchWorkspaceResourceWithPermissions(resourceName string) string {
+	return fmt.Sprintf(`
+resource "opensearch_workspace" "test" {
+  name        = "%s"
+  description = "workspace with permissions"
+  
+  permissions {
+    library_write {
+      users  = ["user1", "user2"]
+      groups = ["admin_group"]
+    }
+    
+    library_read {
+      users  = ["user3"]
+      groups = ["read_group"]
+    }
+  }
 }
 	`, resourceName)
 }
