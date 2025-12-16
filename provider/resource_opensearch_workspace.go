@@ -175,7 +175,7 @@ func resourceOpensearchPutWorkspace(d *schema.ResourceData, m interface{}) (*Wor
 
 	workspaceJSON, err := json.Marshal(workspaceDefinition)
 	if err != nil {
-		return response, fmt.Errorf("body error : %s", workspaceJSON)
+		return response, fmt.Errorf("Body Error : %s", workspaceJSON)
 	}
 
 	var path string
