@@ -186,15 +186,14 @@ func resourceOpensearchPutWorkspace(d *schema.ResourceData, m interface{}) (*Wor
 		path, err = uritemplates.Expand("/api/workspaces/{id}", map[string]string{
 			"id": d.Id(),
 		})
+		if err != nil {
+			return response, fmt.Errorf("error building URL path for workspace: %+v", err)
+		}
 		method = "PUT"
 	} else {
 		// This is a create
 		path = "/api/workspaces"
 		method = "POST"
-	}
-
-	if err != nil {
-		return response, fmt.Errorf("error building URL path for workspace: %+v", err)
 	}
 
 	var body json.RawMessage
