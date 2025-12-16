@@ -80,21 +80,22 @@ func testAccCheckOpensearchWorkspaceDestroy(s *terraform.State) error {
 
 func testCheckOpensearchWorkspaceExists(name string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		for _, rs := range s.RootModule().Resources {
-			if rs.Type != "opensearch_workspace" {
-				continue
-			}
+		rs, ok := s.RootModule().Resources[name]
+		if !ok {
+			return fmt.Errorf("Not found: %s", name)
+		}
 
-			meta := testAccOpendistroProvider.Meta()
+		if rs.Type != "opensearch_workspace" {
+			return fmt.Errorf("Resource %s is not a workspace", name)
+		}
 
-			var err error
-			_, err = resourceOpensearchGetWorkspace(rs.Primary.ID, meta.(*ProviderConf))
+		meta := testAccOpendistroProvider.Meta()
 
-			if err != nil {
-				return err
-			}
+		var err error
+		_, err = resourceOpensearchGetWorkspace(rs.Primary.ID, meta.(*ProviderConf))
 
-			return nil
+		if err != nil {
+			return err
 		}
 
 		return nil

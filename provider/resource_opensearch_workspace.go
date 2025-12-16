@@ -149,7 +149,7 @@ func resourceOpensearchGetWorkspace(workspaceID string, m interface{}) (*Workspa
 	}
 	body = res.Body
 
-	var workspaceResponse WorkspaceGetResponse
+	var workspaceResponse WorkspaceResponse
 	if err := json.Unmarshal(body, &workspaceResponse); err != nil {
 		return workspace, fmt.Errorf("error unmarshalling workspace body: %+v: %+v", err, body)
 	}
@@ -241,12 +241,6 @@ type WorkspaceBody struct {
 
 // WorkspaceResponse represents the API response for workspace operations
 type WorkspaceResponse struct {
-	Success bool          `json:"success"`
-	Result  WorkspaceBody `json:"result"`
-}
-
-// WorkspaceGetResponse represents the API response for getting a workspace
-type WorkspaceGetResponse struct {
 	Success bool          `json:"success"`
 	Result  WorkspaceBody `json:"result"`
 }
